@@ -4,11 +4,11 @@ import (
 	// "log"
 	"testing"
 	"fmt"
-	"time"
+	// "time"
 )
 
 const (
-	empEmpno int = iota
+	empEmpno ColumnId = iota
 	empEname
 	empJob
 	empMgr
@@ -19,66 +19,248 @@ const (
 )
 
 var (
-	empAllCol = []int{empEmpno, empEname, empJob, empMgr, empHiredate, empSal, empComm, empDeptno}
-	empColTypes = map[int]columnType{empEmpno:INTEGER, empEname:BYTESLICE, empJob:BYTESLICE, empMgr:INTEGER, empHiredate:TIME, empSal:FLOAT, empComm:FLOAT, empDeptno:INTEGER}
+	empAllCol = []ColumnId{empEmpno, empEname, empJob, empMgr, empHiredate, empSal, empComm, empDeptno}
+	// empColTypes = map[ColumnId]ColumnType{empEmpno:INTEGER, empEname:BYTESLICE, empJob:BYTESLICE, empMgr:INTEGER, empHiredate:TIME, empSal:FLOAT, empComm:FLOAT, empDeptno:INTEGER}
 )
-
-func TestColumnFamily(t *testing.T) {
-	emp := newColumnFamily(empColTypes)
-
-	if err := emp.create(empAllCol, []interface{}{pi(7369), ps("SMITH"), ps("CLERK"), pi(7902), pt("17-DEC-1980"), pf(800), pf(0), pi(20)}); err != nil {
-		t.Fatal(err)
-	} 
-	if err := emp.create(empAllCol, []interface{}{pi(7499), ps("ALLEN"), ps("SALESMAN"), pi(7698), pt("20-FEB-1981"), pf(1600), pf(300), pi(30)}); err != nil {
-		t.Fatal(err)
-	} 
-	if err := emp.create(empAllCol, []interface{}{pi(7521), ps("WARD"), ps("SALESMAN"), pi(7698), pt("2-FEB-1981"), pf(1250), pf(500), pi(30)}); err != nil {
-		t.Fatal(err)
-	} 
-
-	if err := emp.create(empAllCol, []interface{}{pi(7566, 7654, 7698, 7782, 7788, 7839), ps("JONES", "MARTIN", "BLAKE", "CLARK", "SCOTT", "KING"), ps("MANAGER", "SALESMAN", "MANAGER", "MANAGER", "ANALYST", "PRESIDENT"), pi(7839, 7698, 7839, 7839, 7566, 0), pt("2-APR-1981", "28-SEP-1981", "1-MAY-1981", "9-JUN-1981", "09-DEC-1982", "17-NOV-1981"), pf(2975, 1250, 2850, 2450, 3000, 5000), pf(0, 1400, 0, 0, 0, 0), pi(20, 30, 20, 10, 20, 10)}); err != nil {
-		t.Fatal(err)
-	} 
-	 
-	tuplepos, err := emp.filter([]int{empEname, empDeptno}, []relOp{EQUAL, EQUAL}, []interface{}{ps("KING")[0], pi(10)[0]})
+func TestColumnFamilyBasicOp(t *testing.T) {
+	emp := NewColumnFamily(map[ColumnId]ColumnType{empEmpno:ByteSlice})
+	err := emp.Create([]ColumnId{empEmpno}, []interface{}{[][]byte{[]byte{'a'}, []byte{'b'}, []byte{'d'}}})
 	if err != nil {
 		t.Fatal(err)
-	} 
-	e, g = "[8] [6 8]", fmt.Sprintf("%v %v", sortTP(tuplepos[0]), sortTP(tuplepos[1]))
+	}
+
+	dt, err := emp.Read([]ColumnId{empEmpno}, [][]int{[]int{1}}) 
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, g = "[[b]]", fmt.Sprintf("%s", dt)
  	if e != g {
  		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
  	}
 
-	dt, err := emp.read(empAllCol, [][]int{tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0]})
+ 	tuplepos, err := emp.Filter([]ColumnId{empEmpno}, []relOp{EQUAL}, []interface{}{[]byte{'b'}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[[1]]", fmt.Sprintf("%v", tuplepos)
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+
+ 	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{NOTEQUAL}, []interface{}{[]byte{'b'}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[0 2]", fmt.Sprintf("%v", sortTP(tuplepos[0]))
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+
+ 	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{LESS}, []interface{}{[]byte{'b'}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[0]", fmt.Sprintf("%v", sortTP(tuplepos[0]))
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+
+ 	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{LESSEQUAL}, []interface{}{[]byte{'b'}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[0 1]", fmt.Sprintf("%v", sortTP(tuplepos[0]))
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+
+ 	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{GREATER}, []interface{}{[]byte{'c'}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[2]", fmt.Sprintf("%v", sortTP(tuplepos[0]))
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+
+ 	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{GREATEREQUAL}, []interface{}{[]byte{'c'}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[2]", fmt.Sprintf("%v", sortTP(tuplepos[0]))
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+
+ 	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{GREATEREQUAL}, []interface{}{[]byte{'x'}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[]", fmt.Sprintf("%v", sortTP(tuplepos[0]))
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+
+	err = emp.Delete([]int{1})
 	if err != nil {
 		t.Fatal(err)
 	}  	
- 	e, g = "[7839] [KING] [PRESIDENT] [0] [1981-11-17 00:00:00 +0000 UTC] [5000] [0] [10]", fmt.Sprintf("%v %s %s %v %v %v %v %v", dt[0], dt[1], dt[2], dt[3], dt[4], dt[5], dt[6], dt[7])
+ 	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{ALL}, []interface{}{nil})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[0 2]", fmt.Sprintf("%v", sortTP(tuplepos[0]))
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+}
+
+func TestColumnFamilyBlocksOp(t *testing.T) {
+	blockSize = 32
+	emp := NewColumnFamily(map[ColumnId]ColumnType{empEmpno:ByteSlice})
+	for i := byte(0); i < byte(32); i++ {
+		err := emp.Create([]ColumnId{empEmpno}, []interface{}{[][]byte{[]byte{i, i+1, i+2, i+3}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	e, g = 4, emp.len()
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+	// log.Println(emp)
+
+	dt, err := emp.Read([]ColumnId{empEmpno}, [][]int{[]int{16}}) 
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, g = "[[[16 17 18 19]]]", fmt.Sprintf("%v", dt)
  	if e != g {
  		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
  	}
-}
+	
+	tuplepos, err := emp.Filter([]ColumnId{empEmpno}, []relOp{EQUAL}, []interface{}{[]byte{16, 17, 18, 19}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = "[[16]]", fmt.Sprintf("%v", tuplepos)
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	
+	
+	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{NOTEQUAL}, []interface{}{[]byte{16, 17, 18, 19}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = 31, len(tuplepos[0])
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	 	
+	
+	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{LESS}, []interface{}{[]byte{16, 17, 18, 19}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = 16, len(tuplepos[0])
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	 	
 
-func ps(s ...string) [][]byte {
-	r := make([][]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		r[i] = []byte(s[i])
-	}
-	return r
+	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{LESSEQUAL}, []interface{}{[]byte{16, 17, 18, 19}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = 17, len(tuplepos[0])
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	 	
+
+	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{GREATER}, []interface{}{[]byte{16, 17, 18, 19}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = 15, len(tuplepos[0])
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	 	
+
+	tuplepos, err = emp.Filter([]ColumnId{empEmpno}, []relOp{GREATEREQUAL}, []interface{}{[]byte{16, 17, 18, 19}})
+	if err != nil {
+		t.Fatal(err)
+	} 
+	e, g = 16, len(tuplepos[0])
+ 	if e != g {
+ 		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+ 	}	 	
+
 }
-func pi(i ...int64) []int64 {
-	return i
-}
-func pf(f ...float64) []float64 {
-	return f
-}
-func pt(s ...string) []time.Time {
-	r := make([]time.Time, len(s))
-	for i := 0; i < len(s); i++ {
-		r[i], _ = time.Parse("02-Jan-2006", s[i])
-	}
-	return r
-}
+// func TestColumnFamilyBlocks(t *testing.T) {
+// 	// emp := newColumnFamily(map[int]columnType{empEmpno:INTEGER})
+// 	emp := NewColumnFamily(map[ColumnId]ColumnType{ColumnId(empEmpno):ByteSliceLogged})
+// 	for i := int64(0); i < 10000000; i++ {
+// 		if err := emp.Create([]int{empEmpno}, []interface{}{pi(i)}); err != nil {	
+// 			t.Fatal(err)
+// 		} 
+// 	}
+// 	log.Println(emp)
+// }
+
+// func tTestColumnFamily(t *testing.T) {
+// 	emp := newColumnFamily(empColTypes)
+
+// 	if err := emp.Create(empAllCol, []interface{}{pi(7369), ps("SMITH"), ps("CLERK"), pi(7902), pt("17-DEC-1980"), pf(800), pf(0), pi(20)}); err != nil {
+// 		t.Fatal(err)
+// 	} 
+// 	if err := emp.Create(empAllCol, []interface{}{pi(7499), ps("ALLEN"), ps("SALESMAN"), pi(7698), pt("20-FEB-1981"), pf(1600), pf(300), pi(30)}); err != nil {
+// 		t.Fatal(err)
+// 	} 
+// 	if err := emp.Create(empAllCol, []interface{}{pi(7521), ps("WARD"), ps("SALESMAN"), pi(7698), pt("2-FEB-1981"), pf(1250), pf(500), pi(30)}); err != nil {
+// 		t.Fatal(err)
+// 	} 
+
+// 	if err := emp.Create(empAllCol, []interface{}{pi(7566, 7654, 7698, 7782, 7788, 7839), ps("JONES", "MARTIN", "BLAKE", "CLARK", "SCOTT", "KING"), ps("MANAGER", "SALESMAN", "MANAGER", "MANAGER", "ANALYST", "PRESIDENT"), pi(7839, 7698, 7839, 7839, 7566, 0), pt("2-APR-1981", "28-SEP-1981", "1-MAY-1981", "9-JUN-1981", "09-DEC-1982", "17-NOV-1981"), pf(2975, 1250, 2850, 2450, 3000, 5000), pf(0, 1400, 0, 0, 0, 0), pi(20, 30, 20, 10, 20, 10)}); err != nil {
+// 		t.Fatal(err)
+// 	} 
+	 
+// 	tuplepos, err := emp.filter([]int{empEname, empDeptno}, []relOp{EQUAL, EQUAL}, []interface{}{ps("KING")[0], pi(10)[0]})
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	} 
+// 	e, g = "[8] [6 8]", fmt.Sprintf("%v %v", sortTP(tuplepos[0]), sortTP(tuplepos[1]))
+//  	if e != g {
+//  		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+//  	}
+
+// 	dt, err := emp.read(empAllCol, [][]int{tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0], tuplepos[0]})
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}  	
+//  	e, g = "[7839] [KING] [PRESIDENT] [0] [1981-11-17 00:00:00 +0000 UTC] [5000] [0] [10]", fmt.Sprintf("%v %s %s %v %v %v %v %v", dt[0], dt[1], dt[2], dt[3], dt[4], dt[5], dt[6], dt[7])
+//  	if e != g {
+//  		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
+//  	}
+// }
+
+// func ps(s ...string) [][]byte {
+// 	r := make([][]byte, len(s))
+// 	for i := 0; i < len(s); i++ {
+// 		r[i] = []byte(s[i])
+// 	}
+// 	return r
+// }
+// func pi(i ...int64) []int64 {
+// 	return i
+// }
+// func pf(f ...float64) []float64 {
+// 	return f
+// }
+// func pt(s ...string) []time.Time {
+// 	r := make([]time.Time, len(s))
+// 	for i := 0; i < len(s); i++ {
+// 		r[i], _ = time.Parse("02-Jan-2006", s[i])
+// 	}
+// 	return r
+// }
 
 /*
 CREATE TABLE EMP

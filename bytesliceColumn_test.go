@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+var e, g interface{}
 
 func TestBytesliceColumnBasicOp(t *testing.T) {
 	c := newBytesliceColumn(0, compareBytes, make([]byte, 0, 1024), 0)

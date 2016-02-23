@@ -8,52 +8,58 @@ import (
 	"bytes"
 )
 
+var (
+	errWrongDataType = errors.New("bytesliceColumn operates only on []byte data")
+)
+
 func compareBytes(a, b []byte) int {
 	return bytes.Compare(a, b) 
 }
+
 
 type bytesliceColumn struct {
 	id int
 	tuplePosOffset int
 	cf compareFunc
 	byteData []byte
-	entity [][2]int
+	entity [][2]uint32
  	
- 	entityOrder []int	
+ 	entityOrder []int
 
-	ls int
-	lx int
+ 	// newEnt [][]byte
+ 	// trxa *trxAnchor
 }
 
 func (c *bytesliceColumn) filter(op relOp, n interface{}) ([]int, error) {
 	if op == ALL {
 		return c.entityOrder, nil
 	}
-	ndl, ok := n.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("bytesliceColumn operates only on []byte data (%v) %T", c.id, n)
+
+	// ndl, ok := n.([]byte)
+	// if !ok {
+	// 	return nil, errWrongDataType
+	// }	
+
+	// if err := c.inspect(nil, nil, op, n); err != nil {
+	// 	if err == errNeedleIsLess || err == errNeedleIsGreater {
+	// 		return  []int{}, nil
+	// 	}
+	// 	return nil, err
+	// }
+	ndl := n.([]byte)
+	// if !ok {
+	// 	return nil, fmt.Errorf("bytesliceColumn operates only on []byte data (%v) %T", c.id, n)
+	// }
+
+	// if len(ndl) == 0 {
+	// 	return nil, errors.New("invalid parameter")
+	// }
+
+	sti, eni := 0, 0//len(c.entityOrder), len(c.entityOrder)
+	e, wid, err := c.search(ndl)
+	if err != nil {
+		return nil, err
 	}
-
-	if len(ndl) == 0 {
-		return nil, errors.New("invalid parameter")
-	}
-
-	// sti, eni := 0, 0//len(c.entityOrder), len(c.entityOrder)
-	// e := false
-	// wid := 0
-	// if c.cf(c.byteData[c.entity[c.entityOrder[0]][0]:c.entity[c.entityOrder[0]][1]], ndl) > 0 {
-	// 	log.Println("mensie", c.byteData[c.entity[c.entityOrder[0]][0]:c.entity[c.entityOrder[0]][1]], ndl)
-	// 	return []int{}, nil 
-	// } else 	if c.cf(c.byteData[c.entity[c.entityOrder[len(c.entityOrder)-1]][0]:c.entity[c.entityOrder[len(c.entityOrder)-1]][1]], ndl) < 0 {
-	// 	log.Println("vacsie", c.byteData[c.entity[c.entityOrder[len(c.entityOrder)-1]][0]:c.entity[c.entityOrder[len(c.entityOrder)-1]][1]], ndl)
-	// 	return []int{}, nil
-	// } else {
-
-		sti, eni := 0, 0//len(c.entityOrder), len(c.entityOrder)
-		e, wid, err := c.search(ndl)
-		if err != nil {
-			return nil, err
-		}
 	// }
 	if e {
 		sti = wid
@@ -177,70 +183,100 @@ func (c *bytesliceColumn) delete(tuplePos []int) error {
 }
 
 func (c *bytesliceColumn) read(tuplePos []int, r interface{}) (interface{}, error) {
+	var (
+		ret [][]byte
+		ok bool
+	)
 
-	var ret [][]byte
-	var ok bool
 	if r != nil {
 		ret, ok = r.([][]byte)
 		if !ok {
-			return nil, errors.New("bytesliceColumn operates only on []byte] data")
+			return nil, errWrongDataType
 		}
 	} else {
 		ret = make([][]byte, len(tuplePos))
 	}
 
-	// ret, ok := e.([][]byte)
-	// if !ok {
-	// 	return errors.New("bytesliceColumn operates only on []byte data")
-	// }	
-
-	if len(tuplePos) == 0 {
-		return nil, errors.New("empty tuplePos slice for reading")
-	}
-	// ret := make([][]byte, 0, len(tuplePos))
+	
+	// if len(tuplePos) == 0 {
+	// 	return nil, errors.New("empty tuplePos slice for reading")
+	// }
+	// // ret := make([][]byte, 0, len(tuplePos))
 	for i := 0; i < len(tuplePos); i++ {
 		ti := tuplePos[i] - c.tuplePosOffset
-		// log.Println(i, c.tuplePosOffset, ti, len(c.entity))
 		if ti >= 0 && ti < len(c.entity) {
-
-			// if ti < 0 || ti >= len(c.entity) {
-			// 	return nil, errors.New("wrong tuplePos")		
-			// }
 			r:= make([]byte, len(c.byteData[c.entity[ti][0]:c.entity[ti][1]]))
+			// r:= make([]byte, len(c.byteData[c.entity[ti].a:c.entity[ti].gb()]))
 			copy(r, c.byteData[c.entity[ti][0]:c.entity[ti][1]])
-			//ret = append(ret, r)
+			// copy(r, c.byteData[c.entity[ti].a:c.entity[ti].gb()])
 			ret[i] = r
 		}
 	}
 	return ret, nil
 }
 
-// func (c *bytesliceColumn) hasSpace(e interface{}) bool {
-// 	ent := e.([][]byte)
-// 	tuplePos := len(c.entity)	
-// 	return tuplePos + len(ent) < cap(c.byteData) 
-// }
-func (c *bytesliceColumn) inspect(e interface{}) error {
-	ent, ok := e.([][]byte)
-	if !ok {
-		return fmt.Errorf("bytesliceColumn operates only on []byte data (%v)", c.id)//errors.New("bytesliceColumn operates only on []byte data")
-	}	
-	if len(ent) == 0 {
-		return fmt.Errorf("empty entity slice for creating (%v)", c.id)
+func (c *bytesliceColumn) inspect(e interface{}, tuplePos []int, op relOp, ndl interface{}) error {
+	// log.Println("inspect", c)
+	if e != nil {
+		ent := e.([][]byte)
+		s := 0
+		for i := 0; i < len(ent); i ++ {
+			s += len(ent[i])
+		}
+		if len(c.byteData) + s > cap(c.byteData)  {
+			return errColumnDataFull
+		}
 	}
-	if len(c.entity) + len(ent) > cap(c.byteData) {
-		return errColDataFull
+	if tuplePos != nil {
+		o := false
+		for i := 0; i < len(tuplePos); i++ {
+			ti := tuplePos[i] - c.tuplePosOffset
+			if ti >= 0 && ti < len(c.entity) {
+				o = true
+			}
+		}
+		if !o {
+			return errNoTupleFound
+		}
+	}
+	if ndl != nil {
+		// n := ndl.([]byte)
+		n, ok := ndl.([]byte)
+		if !ok {
+			return errWrongDataType
+		}	
+		if op == ALL {
+			return nil
+		}
+		if c.cf(c.byteData[c.entity[c.entityOrder[0]][0]:c.entity[c.entityOrder[0]][1]], n) > 0 {
+			if op == EQUAL || op == LESS || op == LESSEQUAL {
+				return errNeedleIsLess
+			}
+			// return errNeedleIsLess
+		} else 	if c.cf(c.byteData[c.entity[c.entityOrder[len(c.entityOrder)-1]][0]:c.entity[c.entityOrder[len(c.entityOrder)-1]][1]], n) < 0 {
+			if op == EQUAL || op == GREATER || op == GREATEREQUAL {
+				return errNeedleIsGreater
+			}
+		}
 	}
 	return nil
 }
 
 func (c *bytesliceColumn) create(e interface{}) error {
 
-	if err := c.inspect(e); err != nil {
-		return err
-	}
+	ent, ok := e.([][]byte)
+	if !ok {
+		return errWrongDataType
+	}	
 
-	ent := e.([][]byte)
+	/*if err := c.inspect(e, nil, 0, nil); err != nil {
+			return err
+	}*/
+
+
+	// ent := c.newEnt//e.([][]byte)
+	
+
 	// log.Println(ent)
 	// if !ok {
 	// 	return errors.New("bytesliceColumn operates only on []byte data")
@@ -255,7 +291,10 @@ func (c *bytesliceColumn) create(e interface{}) error {
 	// if tuplePos + len(ent) > cap(c.byteData) {
 	// 	return errColDataFull
 	// }
-	c.entity = c.entity[:tuplePos + len(ent)]
+	// log.Println(tuplePos, len(ent), cap(c.byteData), cap(c.entity))
+	
+	//c.entity = c.entity[:tuplePos + len(ent)]
+	c.entity = append(c.entity, make([][2]uint32, len(ent))...)
 
 	for i := 0; i < len(ent); i++ {
 		n := len(c.byteData)
@@ -263,16 +302,18 @@ func (c *bytesliceColumn) create(e interface{}) error {
 		if err != nil {
 			return err
 		}		
-		c.entityOrder = c.entityOrder[:len(c.entityOrder) + 1]
+		//c.entityOrder = c.entityOrder[:len(c.entityOrder) + 1]
+		c.entityOrder = append(c.entityOrder, 0)
+
 		copy(c.entityOrder[wid + 1:], c.entityOrder[wid:])
 		if ex {
 			// c.entity[tuplePos].body = c.entity[c.entityOrder[wid+1]].body
 			c.entity[tuplePos][0], c.entity[tuplePos][1] = c.entity[c.entityOrder[wid+1]][0], c.entity[c.entityOrder[wid+1]][1]
+			// c.entity[tuplePos].a, c.entity[tuplePos].b = c.entity[c.entityOrder[wid+1]].a, c.entity[c.entityOrder[wid+1]].b
 			c.entityOrder[wid] = tuplePos			
 		} else {
 			c.byteData = append(c.byteData, ent[i]...)			
-			// c.entity[tuplePos].body = c.byteData[n:n + len(ent[i]):n + len(ent[i])]
-			c.entity[tuplePos][0], c.entity[tuplePos][1]  = n, n + len(ent[i])
+			c.entity[tuplePos][0], c.entity[tuplePos][1]  = uint32(n), uint32( n + len(ent[i]))
 			c.entityOrder[wid] = tuplePos	
 		}
 		tuplePos++
@@ -285,7 +326,13 @@ func (c *bytesliceColumn) search(ndl []byte) (bool, int, error) {
 	if c.cf == nil {
 	 	return false, len(c.entityOrder), nil
 	}
-	i := sort.Search(len(c.entityOrder), func(i int) bool { return  c.cf(c.byteData[c.entity[c.entityOrder[i]][0]:c.entity[c.entityOrder[i]][1]], ndl) >= 0 })
+	//i := sort.Search(len(c.entityOrder), func(i int) bool { return  c.cf(c.byteData[int(c.entity[c.entityOrder[i]][0]):int(c.entity[c.entityOrder[i]][1])], ndl) >= 0 })
+	i := sort.Search(len(c.entityOrder), func(i int) bool { 
+		a := int(c.entity[c.entityOrder[i]][0])
+		b := int(c.entity[c.entityOrder[i]][1])
+		// log.Println(a, b, len(c.byteData))
+		return  c.cf(c.byteData[a:b], ndl) >= 0 
+	})
 	if i < len(c.entityOrder) && c.cf(c.byteData[c.entity[c.entityOrder[i]][0]:c.entity[c.entityOrder[i]][1]], ndl) == 0 {
 		return true, i, nil
 	} else {
@@ -293,13 +340,14 @@ func (c *bytesliceColumn) search(ndl []byte) (bool, int, error) {
 	}
 }
 
-func (c *bytesliceColumn) len() int {
-	return len(c.entity)
+func (c *bytesliceColumn) len() (int, int) {
+	return len(c.entityOrder), len(c.entityOrder) + c.tuplePosOffset
 }
 
 
 func (c *bytesliceColumn) String() string {
-	s := fmt.Sprintf("\ncol[%v] ls:%v/lx:%v of:%v [%vB]", c.id, c.ls, c.lx, c.tuplePosOffset, cap(c.byteData))
+	var s string
+	s = fmt.Sprintf("\ncol[%v] of:%v [%vB]", c.id, c.tuplePosOffset, cap(c.byteData))
 	for tuplePos, h := range c.entity {
 		s = s + fmt.Sprintf("\n\t[%v]ent %v", tuplePos + c.tuplePosOffset, c.byteData[h[0]:h[1]])
 	}
@@ -307,13 +355,25 @@ func (c *bytesliceColumn) String() string {
 	return s
 }
 
+func (c *bytesliceColumn) size() int {
+	return len(c.byteData)
+}
+
 func newBytesliceColumn(id int, cf compareFunc, storage []byte, offset int) *bytesliceColumn {
 	return &bytesliceColumn{id: id,
 		tuplePosOffset: offset,
 		cf: cf,
 		byteData: storage,
-		entity: make([][2]int, 0, 1024),		
-		entityOrder: make([]int, 0, 1024)}
+		entity: make([][2]uint32, 0, 64*1024),		
+		entityOrder: make([]int, 0, 64*1024)}
+}
+func newBytesliceColumn2(id ColumnId, storage []byte, offset int) columnInterface {
+	return &bytesliceColumn{id: int(id),
+		tuplePosOffset: offset,
+		cf: compareBytes,
+		byteData: storage,
+		entity: make([][2]uint32, 0, 64*1024),		
+		entityOrder: make([]int, 0, 64*1024)}
 }
 
 

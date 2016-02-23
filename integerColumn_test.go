@@ -7,7 +7,7 @@ import (
  )
 
 func TestIntegerColumnBasicOp(t *testing.T) {
-	c := newIntegerColumn(0, make([]byte,  64), 0)
+	c := newIntegerColumn(0, make([]byte,0, 64), 0)
 
 	err := c.create([]int64{1, 2, -3, 1})
 	if err != nil {
