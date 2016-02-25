@@ -10,9 +10,14 @@ var (
 	ByteSlice = newBytesliceColumn2
 )
 
-var (
-	blockSize = 256*1024
+
+const (
+	DefaultBlockSize = 256*1024
 )
+var (
+	BlockSize = DefaultBlockSize
+)
+
 var (
 	errColumnDataFull = errors.New("column data full")
 	errNoTupleFound = errors.New("tuple not found")
@@ -278,39 +283,71 @@ func (c *columnFamily) len() int {
 }
 
 func (c *columnFamily) String() string {
+	// blk := c.block
+	// i := 0
+	// sum := 0
+	// size := 0
+	// for blk !=nil {
+	// 	for _, cl := range blk.columns {
+	// 		n, _:= cl.len()
+	// 		sum += n
+	// 		size += cl.size()
+	// 	}
+	// 	blk = blk.next
+	// 	i++
+	// }
+
+	// s := fmt.Sprintf("\nfamily blocks:%v - %v [%v]", i, sum, size)
+	// // s = s + fmt.Sprintf("%v", c.block)
+
+	// b :=c.block 
+	// for b  != nil {
+	// 	s = s + fmt.Sprintf("\n%v", b)	
+	// 	b = b.next
+	// }
+	// return s
+	// cd := ""
+	// dt := make(map[ColumnId][2]int)
+
 	blk := c.block
 	i := 0
-	sum := 0
-	size := 0
+	n := 0
+	s := 0
+	cs := ""
 	for blk !=nil {
 		for _, cl := range blk.columns {
-			n, _:= cl.len()
-			sum += n
-			size += cl.size()
+			tn, _:= cl.len()
+			n +=tn
+			s +=cl.size()
+			
 		}
+		cs += fmt.Sprintf("\n%v", blk)
 		blk = blk.next
 		i++
 	}
-
-	s := fmt.Sprintf("\nfamily blocks:%v - %v [%v]", i, sum, size)
-	// s = s + fmt.Sprintf("%v", c.block)
-
-	b :=c.block 
-	for b  != nil {
-		s = s + fmt.Sprintf("\n%v", b)	
-		b = b.next
-	}
-	return s
+	return fmt.Sprintf("[%p] %v(%v); %v blocks:%v", c, statNumber(n), byteSize(s), statNumber(i), cs)
 }
 
+ 
+
 func (c *columnBlock) String() string {
-	s := fmt.Sprintf("\nblk %p", c)
+	// s := fmt.Sprintf("\nblk %p", c)
+	// for _, cl := range c.columns {
+	// 	n, _ := cl.len()
+	// 	s = s + fmt.Sprintf("\n %v [%v]", n, cl.size()/1024)
+	// 	// s = s + fmt.Sprintf("\n %v", cl)
+	// }
+	cs := ""
+	n := 0
+	s := 0
 	for _, cl := range c.columns {
-		n, _ := cl.len()
-		s = s + fmt.Sprintf("\n %v [%v]", n, cl.size()/1024)
+		//tn, _ := cl.len()
+		n++ 
+		s += cl.size()
+		cs = cs + "\n" + fmt.Sprintf("%v", cl)
 		// s = s + fmt.Sprintf("\n %v", cl)
 	}
-	return s
+	return fmt.Sprintf("[%p] %v; %v; %v columns:%v", c, byteSize(s), statNumber(n), c.trxa, cs)
 }
 
 type columnBlock struct {
@@ -350,7 +387,7 @@ type columnBlock struct {
 // }
 
 func newColumnBlock(c map[ColumnId]ColumnType, prev *columnBlock, ta *trxAnchor) *columnBlock {
-	cb := &columnBlock{dataStore:make([]byte, blockSize), 
+	cb := &columnBlock{dataStore:make([]byte, BlockSize), 
 					columns:make(map[ColumnId]columnInterface),
 					trxa: ta}
 

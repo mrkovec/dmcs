@@ -116,7 +116,7 @@ func TestColumnFamilyBasicOp(t *testing.T) {
 }
 
 func TestColumnFamilyBlocksOp(t *testing.T) {
-	blockSize = 32
+	BlockSize = 32
 	emp := NewColumnFamily(map[ColumnId]ColumnType{empEmpno:ByteSlice})
 	for i := byte(0); i < byte(32); i++ {
 		err := emp.Create([]ColumnId{empEmpno}, []interface{}{[][]byte{[]byte{i, i+1, i+2, i+3}}})
@@ -192,7 +192,7 @@ func TestColumnFamilyBlocksOp(t *testing.T) {
  	if e != g {
  		t.Errorf("expected: %v (type %T) and got: %v (type %T)", e, e, g, g)
  	}	 	
-
+	BlockSize = DefaultBlockSize
 }
 // func TestColumnFamilyBlocks(t *testing.T) {
 // 	// emp := newColumnFamily(map[int]columnType{empEmpno:INTEGER})

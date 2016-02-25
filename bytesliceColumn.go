@@ -346,17 +346,18 @@ func (c *bytesliceColumn) len() (int, int) {
 
 
 func (c *bytesliceColumn) String() string {
-	var s string
-	s = fmt.Sprintf("\ncol[%v] of:%v [%vB]", c.id, c.tuplePosOffset, cap(c.byteData))
-	for tuplePos, h := range c.entity {
-		s = s + fmt.Sprintf("\n\t[%v]ent %v", tuplePos + c.tuplePosOffset, c.byteData[h[0]:h[1]])
-	}
-	s = s + fmt.Sprintf("\n\torder:%v", c.entityOrder)
-	return s
+	// var s string
+	// s = fmt.Sprintf("\ncol[%v] of:%v [%vB]", c.id, c.tuplePosOffset, cap(c.byteData))
+	// for tuplePos, h := range c.entity {
+	// 	s = s + fmt.Sprintf("\n\t[%v]ent %v", tuplePos + c.tuplePosOffset, c.byteData[h[0]:h[1]])
+	// }
+	// s = s + fmt.Sprintf("\n\torder:%v", c.entityOrder)
+	// return s
+	return fmt.Sprintf("[%v] %v (%v)", c.id, statNumber(len(c.entityOrder)), byteSize(c.size()))
 }
 
 func (c *bytesliceColumn) size() int {
-	return len(c.byteData)
+	return cap(c.byteData) + cap(c.entity)*64 + cap(c.entityOrder)*64
 }
 
 func newBytesliceColumn(id int, cf compareFunc, storage []byte, offset int) *bytesliceColumn {
@@ -372,8 +373,8 @@ func newBytesliceColumn2(id ColumnId, storage []byte, offset int) columnInterfac
 		tuplePosOffset: offset,
 		cf: compareBytes,
 		byteData: storage,
-		entity: make([][2]uint32, 0, 64*1024),		
-		entityOrder: make([]int, 0, 64*1024)}
+		entity: make([][2]uint32, 0, 1024),		
+		entityOrder: make([]int, 0, 1024)}
 }
 
 
